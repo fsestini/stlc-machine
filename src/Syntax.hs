@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE FlexibleInstances, DeriveFunctor #-}
 
 module Syntax(
@@ -16,10 +17,10 @@ import Data.List
 type Var = String
 
 class FreshPickable a where
-  pickFresh :: Set a -> a
+  pickFresh :: [a] -> a
 
 instance FreshPickable Int where
-  pickFresh = pickFresh' . sort . toList
+  pickFresh = pickFresh' . sort
     where pickFresh' [] = 0
           pickFresh' [n] = n + 1
           pickFresh' (n1:n2:xs) = if n2 - n1 > 1
@@ -29,12 +30,24 @@ instance FreshPickable Int where
 data LambdaTerm a = Var a
                   | Abstr a (LambdaTerm a)
                   | Appl (LambdaTerm a) (LambdaTerm a)
-                  deriving(Eq, Functor)
+                  deriving(Eq, Functor, Foldable)
 
+{-
 instance (Show a) => Show (LambdaTerm a) where
     show (Var x) = show x
     show (Abstr x t) = "λ" ++ (show x) ++ "." ++ (show t)
     show (Appl t t') = "(" ++ (show t) ++ ")(" ++ (show t') ++ ")"
+-}
+
+instance Show (LambdaTerm Int) where
+  show (Var x) = varIntToString x
+  show (Abstr x t) = "λ" ++ (varIntToString x) ++ "." ++ (show t)
+  show (Appl t t') = "(" ++ (show t) ++ ")(" ++ (show t') ++ ")"
+
+varIntToString :: Int -> String
+varIntToString n = varsList 0 !! n
+  where vars = ["x", "y", "z", "w"]
+        varsList n = (Prelude.map (++ (show n)) vars) ++ (varsList (n+1))
 
 data Type = TypeVar Int
           | Arrow Type Type

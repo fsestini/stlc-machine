@@ -1,31 +1,33 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Inference(infer, InferenceState, runInference) where
+module Inference(infer,Context) where
 
-import Data.Set as S
+import Data.List(nub,delete)
+import Data.Set as S(Set(..),empty,singleton,insert,delete,union,fromList,toList)
 import Control.Monad.Identity
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 import Unification
 import Syntax
+import ProofTree
 
 type InferenceState a = StateT UsedTypeVars Maybe a
-
-type UsedTypeVars = [Int]
 
 -- TE standing for Type Expression (type TypeExpr)
 -- Meaning that we are considering type expressions (with variables to be used
 -- in unification) rather than simple types.
-type TEContext a = Set (TECtxtJudgment a)
+type TEContext a = [TECtxtJudgment a]
 type TECtxtJudgment a = (a, TypeExpr)
 
 type TypeJudgment a = (LambdaTerm a, Type)
 
-filterElement :: (a -> Bool) -> Set a -> Maybe a
-filterElement f set = let filtered = S.filter f set
-                          in if size filtered > 0
-                                then Just $ (head . toList) filtered
+filterElement :: (a -> Bool) -> [a] -> Maybe a
+filterElement f list = let filtered = filter f list
+                          in if length filtered > 0
+                                then Just $ head filtered
                                 else Nothing
 
 varTypeJudgment :: Eq a
@@ -38,17 +40,27 @@ varTypeJudgment x = filterElement ((x ==) . fst)
 
 -- Extract the set of variables that are judged in a context.
 varsOfContext :: Ord a => TEContext a -> Set a
-varsOfContext = fromList . varsOfContext' . toList
-  where varsOfContext' :: [TECtxtJudgment a] -> [a]
-        varsOfContext' [] = []
+varsOfContext c = fromList (varsOfContext' c)
+  where varsOfContext' [] = []
         varsOfContext' ((a, t) : rest) = a : (varsOfContext' rest)
 
 -- Pick a fresh variable number
 newTypeVar :: InferenceState Int
 newTypeVar = do usedTypes <- get
-                let newVar = (pickFresh . fromList) usedTypes
+                let newVar = pickFresh usedTypes
                 put (newVar:usedTypes)
                 return newVar
+
+strongDelete :: Eq a => a -> [a] -> [a]
+strongDelete x list = let newList = Data.List.delete x list
+                          in if length list == length newList
+                             then error "strongDelete failed"
+                             else newList
+
+strongInsert :: Eq a => TECtxtJudgment a -> TEContext a -> TEContext a
+strongInsert (v,t) ctxt = if length (filter (\(x,_) -> x == v) ctxt) > 0
+                          then error "strongInsert failed"
+                          else (v,t) : ctxt
 
 -- Compute type equations from term.
 -- Returns the set of equations, the type variable associated with the input
@@ -65,15 +77,15 @@ equations gamma0 (Var x) =
        Just (_, t) -> do newV <- newTypeVar
                          return (gamma0, newV, singleton (TEVar newV, t))
        Nothing     -> do newV <- newTypeVar
-                         return (insert (x, TEVar newV) gamma0,
+                         return (strongInsert (x, TEVar newV) gamma0,
                                  newV, fromList [])
 equations gamma0 term@(Abstr v t) = do
   boundVType <- newTypeVar
-  let freshVar = pickFresh (varsOfContext gamma0)
+  let freshVar = (pickFresh . toList) (varsOfContext gamma0)
       (Abstr v' t') = alphaRename freshVar term
-  (gamma, typ, eq) <- equations (insert (v', TEVar boundVType) gamma0) t'
+  (gamma, typ, eq) <- equations (strongInsert (v', TEVar boundVType) gamma0) t'
   freshT <- newTypeVar
-  return (delete (v', TEVar boundVType) gamma,
+  return (strongDelete (v', TEVar boundVType) gamma,
           freshT,
           insert (TEVar freshT, TEArrow (TEVar boundVType) (TEVar typ)) eq)
 equations gamma0 term@(Appl term1 term2) = do
@@ -86,43 +98,71 @@ equations gamma0 term@(Appl term1 term2) = do
             (eq1 `union` eq2 `union` (equateContexts gamma1 gamma2)))
 
   -- Make union of two contexts, dropping possible duplicates
-uniteUnique :: forall a . Ord a => TEContext a -> TEContext a -> TEContext a
-uniteUnique ctxt1 ctxt2 = union ctxt1 (S.map mapper ctxt2)
+uniteUnique :: forall a . Eq a => TEContext a -> TEContext a -> TEContext a
+uniteUnique ctxt1 ctxt2 = nub $ ctxt1 ++ (map mapper ctxt2)
   where mapper :: TECtxtJudgment a -> TECtxtJudgment a
         mapper (v,t) = case varTypeJudgment v ctxt1 of
                             Just (vv,tt) -> (vv,tt)
                             Nothing -> (v,t)
 
 -- Create equations that equate types of duplicate judgements
-equateContexts :: forall a . Ord a => TEContext a -> TEContext a -> Equations
-equateContexts context1 context2 = equateList (toList context1) (toList context2)
-    where equateList :: [TECtxtJudgment a] -> [TECtxtJudgment a] -> Equations
-          equateList [] _ = empty
-          equateList ((x, t):rest) ctxt =
-            case varTypeJudgment x (fromList ctxt) of
-                 Just (_, t') -> S.insert (t,t') (equateList rest ctxt)
-                 Nothing -> equateList rest ctxt
+equateContexts :: forall a . Eq a => TEContext a -> TEContext a -> Equations
+equateContexts [] _ = empty
+equateContexts ((x, t):rest) ctxt =
+  case varTypeJudgment x ctxt of
+    Just (_, t') -> S.insert (t,t') (equateContexts rest ctxt)
+    Nothing -> equateContexts rest ctxt
 
 -- Infer the type of a term in a given context.
-infer :: forall a . (Ord a, FreshPickable a)
+inferTE :: forall a . (Ord a, FreshPickable a)
       => TEContext a
       -> LambdaTerm a
       -> InferenceState (TEContext a, TypeExpr)
-infer ctxt term = do (newCtxt, typeVar, eqs) <- equations ctxt term
-                     sub <- lift $ unify eqs
-                     let inferredType = applySubstitution (TEVar typeVar) sub
-                         inferredContext = subsContext sub newCtxt
-                     return (inferredContext, inferredType)
-  where subsContext :: (Ord a) => Substitution -> TEContext a -> TEContext a
-        subsContext sub = S.map subsJudgment
+inferTE ctxt term = do (newCtxt, typeVar, eqs) <- equations ctxt term
+                       sub <- lift $ unify eqs
+                       let inferredType = applySubstitution (TEVar typeVar) sub
+                           inferredContext = subsContext sub newCtxt
+                       return (inferredContext, inferredType)
+  where subsContext :: Substitution -> TEContext a -> TEContext a
+        subsContext sub = map subsJudgment
           where subsJudgment (x, t) = (x, applySubstitution t sub)
+
+infer :: (Ord a, FreshPickable a)
+      => Context a
+      -> LambdaTerm a
+      -> Maybe (Context a, Type)
+infer ctxt term = do (teC, te) <- runInference (inferTE (contextToTEContext ctxt) term)
+                     let maxmax = maxTEConst te
+                         newCtxt = teContextToContext (maxmax + 1) teC
+                         newType = instantiateTypeVar (maxmax +1) te
+                     return (newCtxt, newType)
 
 runInference :: InferenceState (TEContext a, TypeExpr) -> Maybe (TEContext a, TypeExpr)
 runInference state = case runStateT state [] of
                           Just ((c,t),_) -> Just (c,t)
                           Nothing -> Nothing
 
-inferClosed :: (FreshPickable a, Ord a) => LambdaTerm a -> Maybe TypeExpr
-inferClosed term = case runStateT (infer S.empty term) [] of
-                        Just ((_,t),_) -> Just t
-                        Nothing -> Nothing
+maxTEConst :: TypeExpr -> Int
+maxTEConst (TEVar _) = -1
+maxTEConst (TEConst x) = x
+maxTEConst (TEArrow t1 t2) = max (maxTEConst t1) (maxTEConst t2)
+
+contextToTEContext :: Context a -> TEContext a
+contextToTEContext [] = []
+contextToTEContext ((x,t):rest) = (x, typeToTypeExpr t) : contextToTEContext rest
+
+teContextToContext :: Int -> TEContext a -> Context a
+teContextToContext startInt ctxt = Prelude.map mapper ctxt
+  where mapper (x,t) = (x, instantiateTypeVar startInt t)
+
+typeToTypeExpr :: Type -> TypeExpr
+typeToTypeExpr (TypeVar x) = TEConst x
+typeToTypeExpr (Arrow t1 t2) = TEArrow (typeToTypeExpr t1) (typeToTypeExpr t2)
+
+instantiateTypeVar :: Int -> TypeExpr -> Type
+instantiateTypeVar startInt (TEVar x) = TypeVar (startInt + x)
+instantiateTypeVar startInt (TEConst x) = TypeVar x
+instantiateTypeVar startInt (TEArrow t1 t2) = Arrow (instantiateTypeVar startInt t1)
+                                                    (instantiateTypeVar startInt t2)
+
+term = Abstr 0 (Abstr 1 (Appl (Var 0) (Var 1))) :: LambdaTerm Int

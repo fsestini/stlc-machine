@@ -1,4 +1,11 @@
-module Parser(parseTerm, parseTermAndType, parseRaw) where
+module Parser(
+  parseTerm,
+  parseTermAndType,
+  parseType,
+  parseRaw,
+  Command(..),
+  parseCommand)
+where
 
 import Text.Parsec
 import Text.Parsec.String
@@ -22,6 +29,18 @@ lambda = char 'λ' *> spaces *> return ()
 point :: Parser ()
 point = char '.' *> spaces *> return ()
 
+data Command = Infer String | Prove String | Check String deriving (Eq, Show)
+
+commandParser :: Parser Command
+commandParser =  parseCommandAux "infer" Infer
+             <|> parseCommandAux "prove" Prove
+             <|> parseCommandAux "check" Check
+  where parseCommandAux :: String -> (String -> Command) -> Parser Command
+        parseCommandAux text ctor = do string text
+                                       spaces
+                                       command <- many1 anyChar
+                                       return $ ctor command
+
 parseWithEol :: Parser () -> Parser a -> Parser a
 parseWithEol myEol p = spaces >> p <* myEol
 
@@ -36,8 +55,20 @@ lambdaTerm :: Parser Term
 lambdaTerm =  Var <$> variable
           <|> char '(' *> lambdaExpr <* char ')'
 
-parseTerm :: String -> Either ParseError Term
-parseTerm = regularParse (parseWithEol eol lambdaExpr)
+parseTerm :: String -> Either String Term
+parseTerm string = case regularParse (parseWithEol eol lambdaExpr) string of
+                        Left parseError -> Left (show parseError)
+                        Right x -> Right x
+
+parseCommand :: String -> Either String Command
+parseCommand string = case regularParse (parseWithEol eol commandParser) string of
+                        Left err -> Left (show err)
+                        Right x -> Right x
+
+parseType :: String -> Either String Type
+parseType string = case regularParse (parseWithEol eol typeExpr) string of
+                     Left parseError -> Left (show parseError)
+                     Right x -> Right x
 
 parseRaw :: String -> Term
 parseRaw input = case parseTerm input of

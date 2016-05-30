@@ -1,7 +1,8 @@
-module TheoremProver(proveProp) where
+module TheoremProver(prove,fastProve) where
 
 import Control.Applicative((<|>))
 import Control.Monad.Trans.State
+import Control.Monad.Trans
 import Syntax
 import ProofTree
 import Data.Set(fromList,toList)
@@ -10,9 +11,8 @@ type Proof a = LambdaTerm a
 type Goal = Type
 type Proposition = Type
 type Variable = Int
-type UsedVars = UsedTypeVars -- fix this
 
-type ProofState a = StateT UsedVars Maybe a
+type ProofState vars a = StateT [vars] Maybe a
 
 propsInContext :: Context a -> [Proposition]
 propsInContext [] = []
@@ -42,32 +42,36 @@ findTargetInContext wanted ctxt =
           filterer _ = False
 
 -- Tactic 'assumption'
-assumption :: Context a -> Goal -> Maybe (LambdaTerm a)
-assumption [] _ = Nothing
+assumption :: Context a -> Goal -> ProofState a (LambdaTerm a)
+assumption [] _ = lift Nothing
 assumption ((v,p):xs) q = if p == q
-                             then Just (Var v)
+                             then lift $ Just (Var v)
                              else assumption xs q
 
 -- Tactic 'apply'
-apply :: Context a -> Goal -> Maybe (Proof a)
-apply ctxt goal = (foldr (<|>) Nothing applies)
+apply :: FreshPickable a => Context a -> Goal -> ProofState a (Proof a)
+apply ctxt goal = StateT $ \s -> foldr (<|>) Nothing (map runStateT (applies) <*> [s])
   where applies = (do (p1, p2) <- findTargetInContext goal ctxt
                       return $ do f <- prove ctxt (Arrow p1 p2)
                                   a <- prove ctxt p1
                                   return $ Appl f a)
 
 -- Tactic 'intro'
-intro :: Context a -> Goal -> Maybe (Proof a)
-intro ctxt (Arrow p1 p2) = do p <- prove ((0, p1):ctxt) p2
-                              return (Abstr 0 p)
-intro _ _ = Nothing
+intro :: FreshPickable a => Context a -> Goal -> ProofState a (Proof a)
+intro ctxt (Arrow p1 p2) = do v <- newVar
+                              p <- prove ((v, p1):ctxt) p2
+                              return (Abstr v p)
+intro _ _ = lift Nothing
 
-prove :: Context a -> Goal -> Maybe (Proof a)
+prove :: FreshPickable a => Context a -> Goal -> ProofState a (Proof a)
 prove ctxt goal =  assumption ctxt goal
                <|> apply ctxt goal
                <|> intro ctxt goal
 
-newVar :: ProofState TypeVarCode
+fastProve :: Goal -> Maybe (Proof Int)
+fastProve g = fmap fst $ runStateT (prove [] g) []
+
+newVar :: FreshPickable a => ProofState a a
 newVar = do usedVars <- get
             let newVar = pickFresh usedVars
             put (newVar:usedVars)
