@@ -1,25 +1,24 @@
-module TheoremProver where
+module TheoremProver(proveProp) where
 
 import Control.Applicative((<|>))
 import Control.Monad.Trans.State
 import Syntax
 import ProofTree
+import Data.Set(fromList,toList)
 
-type Proof = Term
+type Proof a = LambdaTerm a
 type Goal = Type
 type Proposition = Type
-type ListContext = [(Variable, Proposition)]
-type Term = LambdaTerm Int
 type Variable = Int
 type UsedVars = UsedTypeVars -- fix this
 
 type ProofState a = StateT UsedVars Maybe a
 
-propsInContext :: ListContext -> [Proposition]
+propsInContext :: Context a -> [Proposition]
 propsInContext [] = []
 propsInContext ((_,p):rest) = p : propsInContext rest
 
-containsVar :: ListContext -> Int -> Bool
+containsVar :: Context a -> Int -> Bool
 containsVar [] _ = False
 containsVar ((_, TypeVar x):xs) v = if x == v
                                     then True
@@ -31,7 +30,7 @@ findTargetInProp wanted hyp@(Arrow _ p2) | wanted == p2 = Just hyp
                                          | otherwise    = findTargetInProp wanted p2
 findTargetInProp _ _ = Nothing
 
-findTargetInContext :: Proposition -> ListContext -> [(Proposition, Proposition)]
+findTargetInContext :: Proposition -> Context a -> [(Proposition, Proposition)]
 findTargetInContext _ [] = []
 findTargetInContext wanted ctxt =
   let mapped = map (findTargetInProp wanted) (propsInContext ctxt)
@@ -43,14 +42,14 @@ findTargetInContext wanted ctxt =
           filterer _ = False
 
 -- Tactic 'assumption'
-assumption :: ListContext -> Goal -> Maybe Term
+assumption :: Context a -> Goal -> Maybe (LambdaTerm a)
 assumption [] _ = Nothing
 assumption ((v,p):xs) q = if p == q
                              then Just (Var v)
                              else assumption xs q
 
 -- Tactic 'apply'
-apply :: ListContext -> Goal -> Maybe Proof
+apply :: Context a -> Goal -> Maybe (Proof a)
 apply ctxt goal = (foldr (<|>) Nothing applies)
   where applies = (do (p1, p2) <- findTargetInContext goal ctxt
                       return $ do f <- prove ctxt (Arrow p1 p2)
@@ -58,49 +57,21 @@ apply ctxt goal = (foldr (<|>) Nothing applies)
                                   return $ Appl f a)
 
 -- Tactic 'intro'
-intro :: ListContext -> Goal -> Maybe Proof
+intro :: Context a -> Goal -> Maybe (Proof a)
 intro ctxt (Arrow p1 p2) = do p <- prove ((0, p1):ctxt) p2
                               return (Abstr 0 p)
 intro _ _ = Nothing
 
-{-
-
-     A,B,A->B->C |- A->B->C       A,B,A->B->C |- A
-    ----------------------------------------------
-                    A,B,A->B->C |- B -> C                       A,B,A->B->C |- B
-                   ---------------------------------------------------------------
-                                        A, B, (A -> (B -> C)) |- C
-                                       ------------------------------
-                                       ------------------------------
-                                       A -> B -> (A -> (B -> C)) -> C
-
--}
-
-prove :: ListContext -> Goal -> Maybe Proof
+prove :: Context a -> Goal -> Maybe (Proof a)
 prove ctxt goal =  assumption ctxt goal
                <|> apply ctxt goal
                <|> intro ctxt goal
 
 newVar :: ProofState TypeVarCode
 newVar = do usedVars <- get
-            let newVar = findUnusedTypeVar usedVars
+            let newVar = pickFresh usedVars
             put (newVar:usedVars)
             return newVar
-
--- prove :: ListContext -> Goal -> Proof
--- prove ctxt goal | findInContext ctxt goal = True
---                 | or applies              = True
---                 | otherwise = case goal of
---                                 (Arrow p1 p2) -> prove (('a', p1):ctxt) p2
---                                 _             -> False
---   where applies = ( do (p1, p2) <- findTargetInContext goal ctxt
---                        let provedP1 = prove ctxt (Arrow p1 p2)
---                            provedP2 = prove ctxt p1
---                        return $ provedP1 && provedP2)
-
--- intros :: ListContext -> Goal -> (ListContext, Goal)
--- intros ctxt (Arrow p1 p2) = intros (('a', p1):ctxt) p2
--- intros ctxt p = (ctxt, p)
 
 testT = Arrow (TypeVar 0) (Arrow (TypeVar 1) (TypeVar 2))
 taut1 = Arrow (TypeVar 0) (TypeVar 0)
