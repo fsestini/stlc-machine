@@ -51,9 +51,10 @@ hasOffendingEquations :: Equations -> Bool
 hasOffendingEquations = any isOffending
     where isOffending (TEConst _, TEArrow _ _) = True
           isOffending (TEArrow _ _, TEConst _) = True
+          isOffending (TEConst c1, TEConst c2) = c1 /= c2
           isOffending _ = False
 
--- STEP 3: Filter out identities
+-- Step 3: Filter out identities
 isIdentity :: Equation -> Bool
 isIdentity (TEVar v, TEVar v') = v == v'
 isIdentity _ = False
@@ -135,3 +136,5 @@ unify equations = do equations' <- step equations
 
 applySubstitution :: TypeExpr -> Substitution-> TypeExpr
 applySubstitution = S.foldr (uncurry substitute)
+
+eqs = fromList [(TEVar 1,TEVar 0),(TEVar 2,TEArrow (TEVar 0) (TEVar 1)),(TEVar 2,TEArrow (TEConst 0) (TEConst 1))]
