@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Inference(infer,Context) where
+module Inference(infer,Context,equations,typeToTypeExpr) where
 
 import Data.List(nub,delete)
 import Data.Set as S(Set(..),empty,singleton,insert,delete,union,fromList,toList)
