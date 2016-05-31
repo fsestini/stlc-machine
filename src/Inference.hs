@@ -164,5 +164,3 @@ instantiateTypeVar startInt (TEVar x) = TypeVar (startInt + x)
 instantiateTypeVar startInt (TEConst x) = TypeVar x
 instantiateTypeVar startInt (TEArrow t1 t2) = Arrow (instantiateTypeVar startInt t1)
                                                     (instantiateTypeVar startInt t2)
-
-term = Abstr 0 (Abstr 1 (Appl (Var 0) (Var 1))) :: LambdaTerm Int
