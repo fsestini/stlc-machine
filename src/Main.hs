@@ -24,7 +24,7 @@ mainLoop = do putStr "> "
               case parseCommand command of
                 Right (Infer s) -> inferCommand s
                 Right (Prove s) -> proveCommand s
-                Right (Check s) -> putStrLn $ "to check: " ++ s
+                Right (Check s) -> checkCommand s
                 _ -> putStrLn "an error occurred"
               mainLoop
 
@@ -50,6 +50,15 @@ proveCommand typeString = do result <- runEitherT $ do
                              case result of
                                Left err -> putStrLn ("error: " ++ err)
                                Right val -> putStrLn val
+
+checkCommand :: String -> IO ()
+checkCommand string = do result <- runEitherT $ do
+                           (term, typ) <- hoistEither $ parseTermAndType string
+                           return $ typeCheck (convert term) typ
+                         case result of
+                           Left err -> putStrLn $ "error: " ++ err
+                           Right True -> putStrLn "Ok."
+                           Right False -> putStrLn "Does not typecheck"
 
 showContext :: Context Int -> String
 showContext [] = ""
