@@ -75,13 +75,3 @@ inferEither :: (Ord a, FreshPickable a)
 inferEither c t = case infer c t of
                        Just (cc,tt) -> Right (cc,tt)
                        Nothing -> Left "cannot unify"
-
-convert :: LambdaTerm String -> LambdaTerm Int
-convert term = fmap (mapper vars) term
-  where vars = nub $ Prelude.foldr (:) [] term
-        mapper vars x = fromJust $ elemIndex x vars
-
-varIntToString :: Int -> String
-varIntToString n = varsList 0 !! n
-  where vars = ["x", "y", "z", "w"]
-        varsList n = (map (++ (show n)) vars) ++ (varsList (n+1))
