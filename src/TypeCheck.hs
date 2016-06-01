@@ -10,7 +10,7 @@ import Inference
 typeCheck :: (FreshPickable a, Ord a) => LambdaTerm a -> Type -> Bool
 typeCheck term typ =
   case (do ((ctxt,v,eqs),_) <- runStateT (equations [] term) []
-           guard (length ctxt /= 0)
+           guard (length ctxt == 0)
            let eqs' = insert (TEVar v, typeToTypeExpr typ) eqs
            unify eqs') of
     Just _ -> True
