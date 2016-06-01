@@ -7,9 +7,12 @@ module Syntax(
     Type(..),
     alphaRename,
     substitute,
+    convert,
+    varIntToString,
     FreshPickable(..))
     where
 
+import Data.Maybe
 import Data.Char
 import Data.Set as S
 import Data.List
@@ -31,13 +34,6 @@ data LambdaTerm a = Var a
                   | Abstr a (LambdaTerm a)
                   | Appl (LambdaTerm a) (LambdaTerm a)
                   deriving(Eq, Functor, Foldable)
-
-{-
-instance (Show a) => Show (LambdaTerm a) where
-    show (Var x) = show x
-    show (Abstr x t) = "λ" ++ (show x) ++ "." ++ (show t)
-    show (Appl t t') = "(" ++ (show t) ++ ")(" ++ (show t') ++ ")"
--}
 
 instance Show (LambdaTerm Int) where
   show (Var x) = varIntToString x
@@ -74,6 +70,12 @@ substitute var subs (Abstr x t) | var == x = (Abstr x t)
                                 | otherwise = error "illegal variable-capturing substitution"
 substitute var subs (Appl t1 t2) = Appl (substitute var subs t1) (substitute var subs t2)
 
--- Partial function. It only applies to lambda abstractions by alpha renaming the variable bound by it.
+-- Partial function. It only applies to lambda abstractions
+-- by alpha-renaming the variable bound by it.
 alphaRename :: Ord a => a -> LambdaTerm a -> LambdaTerm a
 alphaRename newVar (Abstr v t) = Abstr newVar (substitute v (Var newVar) t)
+
+convert :: LambdaTerm String -> LambdaTerm Int
+convert term = fmap (mapper vars) term
+  where vars = nub $ Prelude.foldr (:) [] term
+        mapper vars x = fromJust $ elemIndex x vars
