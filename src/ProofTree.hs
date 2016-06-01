@@ -1,7 +1,6 @@
 module ProofTree(
   UsedTypeVars,
   TypeVarCode,
-  UsedTypeVars,
   Context,
   CtxtJudgment
   ) where
