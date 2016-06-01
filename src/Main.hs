@@ -14,12 +14,15 @@ import Control.Monad.Trans.Either
 import Control.Monad.Trans.Writer
 import Control.Monad.Identity
 import Control.Monad.Trans
+import System.IO
 
+main :: IO ()
 main = do putStrLn "Welcome to STLC Machine!"
           mainLoop
 
 mainLoop :: IO ()
 mainLoop = do putStr "> "
+              hFlush stdout
               command <- getLine
               case parseCommand command of
                 Right (Infer s) -> inferCommand s
