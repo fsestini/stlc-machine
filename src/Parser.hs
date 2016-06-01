@@ -73,16 +73,19 @@ parseRaw input = case parseTerm input of
                       Left err   -> error $ show err
                       Right term -> term
 
-termAndType :: Parser (Term, Maybe Type)
-termAndType = do term <- lambdaExpr <* spaces
-                 ttt  <- typePart
-                 return (term, ttt)
+termAndType :: Parser ((LambdaTerm String), Type)
+termAndType = do term <- lexeme lambdaExpr
+                 lexeme (char ':')
+                 typ  <- lexeme typeExpr
+                 return (term, typ)
 
-typePart :: Parser (Maybe Type)
-typePart = (char ':' *> spaces *> (Just <$> typeExpr)) <|> return Nothing
+--typePart :: Parser (Maybe Type)
+--typePart = (char ':' *> spaces *> (Just <$> typeExpr)) <|> return Nothing
 
-parseTermAndType :: String -> Either ParseError (Term, Maybe Type)
-parseTermAndType = regularParse (parseWithEol eol termAndType)
+parseTermAndType :: String -> Either String ((LambdaTerm String), Type)
+parseTermAndType string = case regularParse (parseWithEol eol termAndType) string of
+                            Left err -> Left (show err)
+                            Right x -> Right x
 
 ---
 
