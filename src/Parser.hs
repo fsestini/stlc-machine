@@ -12,8 +12,6 @@ import Text.Parsec.String
 import Syntax
 import Data.Char
 
-type Term = LambdaTerm String
-
 regularParse :: Parser a -> String -> Either ParseError a
 regularParse p = parse p ""
 
@@ -47,15 +45,15 @@ parseWithEol myEol p = spaces >> p <* myEol
 eol :: Parser ()
 eol = eof
 
-lambdaExpr :: Parser Term
+lambdaExpr :: Parser (LambdaTerm String)
 lambdaExpr =  Abstr <$> (lambda *> variable) <*> (point *> lambdaExpr)
           <|> foldl1 Appl <$> (many1 lambdaTerm)
 
-lambdaTerm :: Parser Term
+lambdaTerm :: Parser (LambdaTerm String)
 lambdaTerm =  Var <$> variable
           <|> char '(' *> lambdaExpr <* char ')'
 
-parseTerm :: String -> Either String Term
+parseTerm :: String -> Either String (LambdaTerm String)
 parseTerm string = case regularParse (parseWithEol eol lambdaExpr) string of
                         Left parseError -> Left (show parseError)
                         Right x -> Right x
@@ -70,7 +68,7 @@ parseType string = case regularParse (parseWithEol eol typeExpr) string of
                      Left parseError -> Left (show parseError)
                      Right x -> Right x
 
-parseRaw :: String -> Term
+parseRaw :: String -> (LambdaTerm String)
 parseRaw input = case parseTerm input of
                       Left err   -> error $ show err
                       Right term -> term
