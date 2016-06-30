@@ -69,7 +69,7 @@ evalCommand :: String -> IO ()
 evalCommand string = do result <- runEitherT $ do
                           term <- hoistEither $ fmap convert (parseTerm string)
                           let (nf,steps,_) = compute term
-                          return $ "Result: " ++ show nf ++ "\nResuction steps: " ++ show steps
+                          return $ "Result: " ++ show nf ++ "\nReduction steps: " ++ show steps
                         case result of
                           Left err -> putStrLn $ "error: " ++ err
                           Right str -> putStrLn str
