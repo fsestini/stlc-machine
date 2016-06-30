@@ -2,8 +2,6 @@ import Data.Maybe
 import Control.Applicative
 import Syntax
 
-main = undefined
-
 data NamelessTerm = NLVar Int
                   | NLAbstr NamelessTerm
                   | NLAppl NamelessTerm NamelessTerm deriving (Eq)
