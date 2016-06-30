@@ -1,7 +1,11 @@
-module DeBruijn(NamelessTerm, nlCompute, removeNames, restoreNames) where
+{-# LANGUAGE ScopedTypeVariables #-}
+
+module Eval (compute) where
 
 import Control.Applicative
 import Syntax
+import Control.Monad.State
+import Control.Monad.Writer
 
 type NameContext a = [a]
 
@@ -44,8 +48,8 @@ reduce (NLAppl (NLAbstr t) t') = Just betaReduced
 reduce (NLAbstr t) = do t' <- reduce t
                         return $ NLAbstr t'
 reduce (NLAppl t t') = (do newT <- reduce t
-                           return $ NLAppl newT t') <|>
-                       (do newT' <- reduce t'
+                           return $ NLAppl newT t')
+                   <|> (do newT' <- reduce t'
                            return $ NLAppl t newT')
 reduce _ = Nothing
 
@@ -64,9 +68,23 @@ substitution (NLAbstr t) j s = NLAbstr (substitution t (j+1) (shift 1 s))
 substitution (NLAppl t t') j s = NLAppl (substitution t j s)
                                         (substitution t' j s)
 
-nlCompute :: NamelessTerm -> (NamelessTerm, Int)
-nlCompute term = case reduce term of
-                      Nothing -> (term, 0)
-                      Just term' -> let (ttt, n) = nlCompute term'
-                                        in (ttt, n+1)
+type ReductionMonad a = StateT Int (Writer [NamelessTerm]) a
 
+tick :: ReductionMonad ()
+tick = do ticks <- get
+          put $ ticks + 1
+
+nlCompute' :: NamelessTerm -> ReductionMonad NamelessTerm
+nlCompute' term = tell [term] >> case reduce term of
+                       Nothing -> return term
+                       Just term' -> tick >> nlCompute' term'
+
+nlCompute :: NamelessTerm -> (NamelessTerm, Int, [NamelessTerm])
+nlCompute term = (trm, ticks, reductions)
+  where ((trm, ticks), reductions) = runWriter $ runStateT (nlCompute' term) 0
+
+compute :: forall a . (FreshPickable a, Eq a)
+        => LambdaTerm a -> (LambdaTerm a, Int, [LambdaTerm a])
+compute term = (restoreNames [] trm :: LambdaTerm a, ticks,
+                map (restoreNames []) reductions :: [LambdaTerm a])
+  where (trm, ticks, reductions) = nlCompute (removeNames [] term)
