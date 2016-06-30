@@ -44,7 +44,7 @@ restoreNames gamma (NLAbstr t) = Abstr fresh (restoreNames (fresh:gamma) t)
 
 -- Apply a step of beta-reduction according to the leftmost outermost reduction
 -- strategy. If a redex is found, the whole contractum is returned, otherwise
--- returns it Nothing.
+-- it returns Nothing.
 reduce :: NamelessTerm -> Maybe NamelessTerm
 reduce (NLAppl (NLAbstr t) t') = Just betaReduced
     where betaReduced = shift (-1) (substitution t 0 (shift 1 t'))
