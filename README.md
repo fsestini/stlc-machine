@@ -49,6 +49,15 @@ Type checking is a relatively trivial task, which corresponds to check if the pr
 	Does not typecheck
 
 ## Normalization
-The tool can be used to normalize (evaluate) typed as well as untyped terms. The only difference is that all typed terms are of course strongly normalizing, hence the normalization procedure is guaranteed to terminate.
+The tool can be used to normalize (evaluate) arbitrary λ-terms. The evaluation is performed according to a normal order reduction strategy.
 
-Coming soon...
+	$ stlc-machine
+	> eval (λx.λy.x)(λx.x)(λx.λy.y)(λx.λy.λz.z)(λw.w)
+	Result: λx0.λy0.y0
+	Reduction steps: 4
+	> eval (λx.λy.x)(λx.x)((λx.(x x))(λx.(x x)))
+	Result: λx0.x0
+	Reduction steps: 2
+	> eval (λx.(x x))(λx.(x x))
+	wait 'till you get tired...
+	^C
