@@ -8,6 +8,7 @@ import Control.Monad
 import Inference
 import TypeCheck
 import Syntax
+import Eval
 import TheoremProver
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Either
@@ -28,6 +29,7 @@ mainLoop = do putStr "> "
                 Right (Infer s) -> inferCommand s
                 Right (Prove s) -> proveCommand s
                 Right (Check s) -> checkCommand s
+                Right (Eval s)  -> evalCommand s
                 _ -> putStrLn "an error occurred"
               mainLoop
 
@@ -62,6 +64,15 @@ checkCommand string = do result <- runEitherT $ do
                            Left err -> putStrLn $ "error: " ++ err
                            Right True -> putStrLn "Ok."
                            Right False -> putStrLn "Does not typecheck"
+
+evalCommand :: String -> IO ()
+evalCommand string = do result <- runEitherT $ do
+                          term <- hoistEither $ fmap convert (parseTerm string)
+                          let (nf,steps,_) = compute term
+                          return $ "Result: " ++ show nf ++ "\nResuction steps: " ++ show steps
+                        case result of
+                          Left err -> putStrLn $ "error: " ++ err
+                          Right str -> putStrLn str
 
 showContext :: Context Int -> String
 showContext [] = ""

@@ -40,6 +40,11 @@ instance Show (LambdaTerm Int) where
   show (Abstr x t) = "λ" ++ (varIntToString x) ++ "." ++ (show t)
   show (Appl t t') = "(" ++ (show t) ++ ")(" ++ (show t') ++ ")"
 
+instance Show (LambdaTerm String) where
+  show (Var x) = x
+  show (Abstr x t) = "λ" ++ x ++ "." ++ (show t)
+  show (Appl t t') = "(" ++ (show t) ++ ")(" ++ (show t') ++ ")"
+
 varIntToString :: Int -> String
 varIntToString n = varsList 0 !! n
   where vars = ["x", "y", "z", "w"]

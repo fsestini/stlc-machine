@@ -12,6 +12,12 @@ import Text.Parsec.String
 import Syntax
 import Data.Char
 
+data Command = Infer String
+             | Prove String
+             | Check String
+             | Eval String
+             deriving (Eq, Show)
+
 regularParse :: Parser a -> String -> Either ParseError a
 regularParse p = parse p ""
 
@@ -27,12 +33,11 @@ lambda = char 'λ' *> spaces *> return ()
 point :: Parser ()
 point = char '.' *> spaces *> return ()
 
-data Command = Infer String | Prove String | Check String deriving (Eq, Show)
-
 commandParser :: Parser Command
 commandParser =  parseCommandAux "infer" Infer
              <|> parseCommandAux "prove" Prove
              <|> parseCommandAux "check" Check
+             <|> parseCommandAux "eval" Eval
   where parseCommandAux :: String -> (String -> Command) -> Parser Command
         parseCommandAux text ctor = do string text
                                        spaces
