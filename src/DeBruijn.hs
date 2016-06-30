@@ -3,7 +3,7 @@ module DeBruijn(NamelessTerm, nlCompute, removeNames, restoreNames) where
 import Control.Applicative
 import Syntax
 
-type NameContext = [String]
+type NameContext a = [a]
 
 data NamelessTerm = NLVar Int
                   | NLAbstr NamelessTerm
@@ -14,9 +14,7 @@ instance Show NamelessTerm where
     show (NLAbstr t) = "λ." ++ show t
     show (NLAppl t t') = "(" ++ show t ++ ")(" ++ show t' ++ ")"
 
-names = ["x", "y", "z", "w", "a", "b", "c", "d", "e"]
-
-fromContext :: NameContext -> String -> Int
+fromContext :: Eq a => NameContext a -> a -> Int
 fromContext [] _ = error "ill name context"
 fromContext (x:xs) y = if x == y then 0 else 1 + fromContext xs y
 
@@ -24,23 +22,18 @@ index :: [a] -> Int -> a
 index [] _ = error "empty list"
 index (x:xs) n = if n == 0 then x else index xs (n-1)
 
-freshName :: NameContext -> String
-freshName [] = head names
-freshName gamma = let ll = filter (not . (`elem` gamma)) names
-                      in head ll
-
-removeNames :: NameContext -> LambdaTerm String -> NamelessTerm
+removeNames :: Eq a => NameContext a -> LambdaTerm a -> NamelessTerm
 removeNames gamma (Var x) = NLVar (fromContext gamma x)
 removeNames gamma (Appl t t') = NLAppl (removeNames gamma t)
                                        (removeNames gamma t')
 removeNames gamma (Abstr x t) = NLAbstr (removeNames (x:gamma) t)
 
-restoreNames :: NameContext -> NamelessTerm -> LambdaTerm String
+restoreNames :: FreshPickable a => NameContext a -> NamelessTerm -> LambdaTerm a
 restoreNames gamma (NLVar n) = Var (index gamma n)
 restoreNames gamma (NLAppl t t') = Appl (restoreNames gamma t)
                                         (restoreNames gamma t')
 restoreNames gamma (NLAbstr t) = Abstr fresh (restoreNames (fresh:gamma) t)
-    where fresh = freshName gamma
+    where fresh = pickFresh gamma
 
 -- Apply a step of beta-reduction according to the leftmost outermost reduction
 -- strategy. If a redex is found, the whole contractum is returned, otherwise
