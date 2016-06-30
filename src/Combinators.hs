@@ -1,13 +1,10 @@
+module Combinators (ifThenElse, isZero, numeral, successor, predecessor, yCombinator) where
+
 import Data.Maybe
 import Control.Applicative
 import Syntax
-import DeBruijn
 
 ------------------------------------
-
-compute :: LambdaTerm String -> (LambdaTerm String, Int)
-compute term = let (t, n) = nlCompute (removeNames [] term)
-               in (restoreNames [] t, n)
 
 ----------------------------------------------------------------
 
@@ -27,14 +24,11 @@ sumF = Abstr "f" (Abstr "x" (Abstr "y"
                                         `Appl` (predecessor <$$> (Var "y")))))))
 lambdaSum = Appl yCombinator sumF
 
--- fact = Abstr "f" (Abstr "n" (ifThenElse `Appl` (Appl isZero (Var "n")) `Appl` (numeral 1) `Appl` (Appl mult (Appl (Var "f") (Appl sub (Var "n") (numeral 1))))))
+iComb :: LambdaTerm Int
+iComb = Abstr 0 (Var 0)
 
-kComb :: LambdaTerm String
-kComb = Abstr "x" (Abstr "y" (Var "x"))
-
--- pair m n = Abstr "x" (Appl (Appl (Var "x") m) n)
--- first = Abstr "p" (Appl (Var "p") true)
--- second = Abstr "p" (Appl (Var "p") false)
+kComb :: LambdaTerm Int
+kComb = Abstr 0 (Abstr 1 (Var 0))
 
 numeral :: Int -> LambdaTerm String
 numeral 0 = Abstr "y" (Abstr "x" (Var "x"))
@@ -67,3 +61,4 @@ asdF = Abstr "f" (Abstr "x" (ifThenElse <$$> (isZero <$$> (Var "x"))
                                                      <$$> (Var "x")))))
 
 asd = yCombinator <$$> asdF
+
