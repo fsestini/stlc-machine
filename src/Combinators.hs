@@ -4,10 +4,6 @@ import Data.Maybe
 import Control.Applicative
 import Syntax
 
-------------------------------------
-
-----------------------------------------------------------------
-
 true = Abstr "x" (Abstr "y" (Var "x"))
 false = Abstr "x" (Abstr "y" (Var "y"))
 ifThenElse = Abstr "b" (Abstr "m" (Abstr "n" (Appl (Appl (Var "b") (Var "m")) (Var "n"))))
