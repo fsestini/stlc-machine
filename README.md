@@ -37,7 +37,7 @@ Propositions that are not intuitionistically valid do not have a corresponding p
 	error: not an intuitionistic tautology
 
 ## Type checking
-Type checking is a relatively trivial task, which corresponds to check if the provided type corresponds to the one returned by the inference algorithm (up to unification).
+Type checking is a relatively trivial task, which corresponds to checking if the provided type corresponds to the one returned by the inference algorithm (up to unification).
 
 	$ stlc-machine
 	Welcome to STLC Machine!
